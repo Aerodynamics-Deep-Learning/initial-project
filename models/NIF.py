@@ -68,38 +68,38 @@ class NIF(nn.Module):
 
         # Add hidden layers
         for i in range(len(self.shape_hidden_units)-1):
-
             self.shape_network.append(nn.Linear(in_features=self.shape_hidden_units[i], out_features=self.shape_hidden_units[i+1]))
 
         # Add output layer
         self.shape_network.append(nn.Linear(in_features=self.shape_hidden_units[-1], out_features=self.shape_o_dim))
 
-
     def _call_shape_network(self, shape_input, latent_space):
 
         """
-        This is a little untraditional...
+        This is a little untraditional... Hwere we call each layer normally, but at the end of each layer before applying 
+        an activation function, we pointwise multiply with some part of the latent space vector obtained from param net.
+        Then we obviously input this into an activation function.
         """
 
-        start_offset = 0
+        start_offset = 0 # to make sure we start slicing from start and then have a moving slicer
 
-        self.total_units = self.shape_hidden_units + [self.shape_o_dim] # add the output 
+        self.total_units = self.shape_hidden_units + [self.shape_o_dim] # add the output dim since we have as many outputs as the hidden units + output layer
 
         for layer, out_dim in zip(self.shape_network, self.total_units):
 
-            out = layer(shape_input)
+            out = layer(shape_input) # take the result from layer
 
-            latent_slice = latent_space[:, start_offset:start_offset+out_dim] # 
-            out = out * latent_slice
+            latent_slice = latent_space[:, start_offset:start_offset+out_dim] # slice a part of latent space
+            out = out * latent_slice # point wise multiply the out and latent space
 
-            out = self.shape_activation(out)
-            start_offset += out_dim
+            out = self.shape_activation(out) # put into the activation function
+            start_offset += out_dim # offset the slicing start
 
-        return out
+        return out # return the output once done
 
     def forward(self, inputs):
 
-        shape_input = inputs[:, :self.param_i_dim-1] #-1 because dim and slice have -1 offset
+        shape_input = inputs[:, :self.param_i_dim-1] #-1 because dim and slice have -1 offset we, input the dims starting from 1 not like indices where they start from 0
         param_input = inputs[:, self.param_i_dim-1:]
 
         latent_space = self.parameter_network(param_input) # take the latent space from parameter network
