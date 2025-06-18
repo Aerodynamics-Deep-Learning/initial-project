@@ -46,17 +46,17 @@ def train_one_epoch(model, optimizer, criterion, inputs, targets, batch_size= 32
 
     return running_loss / n_samples
 
-def def_NIF_and_optimizer(cfg_shape_net, cfg_param_net, lr= 0.001):
+def create_NIF_and_optimizer(cfg_shape_net, cfg_param_net, lr= 0.001):
     model = NIF(cfg_shape_net, cfg_param_net)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     return model, optimizer
 
-def def_FourierNIF_and_optimizer(cfg_shape_net, cfg_param_net, lr= 0.001):
+def create_FourierNIF_and_optimizer(cfg_shape_net, cfg_param_net, lr= 0.001):
     model = FourierNIF(cfg_shape_net, cfg_param_net)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     return model, optimizer
 
-def def_MLP_and_optimizer(cfg, lr= 0.001):
+def create_MLP_and_optimizer(cfg, lr= 0.001):
     model = MLP(cfg)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     return model, optimizer

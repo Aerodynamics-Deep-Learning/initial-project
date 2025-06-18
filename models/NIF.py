@@ -1,20 +1,19 @@
 """
 Here, we define the Neural Implict Flow (NIF) models. Basing on the work done by Sahowu Pan and Yaser Afshar, as like in the GitHub repo: https://github.com/pswpswpsw/nif
-This currently shares a lot of resemblance with the GitHub repo, we do not claim any originality here. Further models will be added later.
+This currently shares a lot of resemblance with the GitHub repo, we do not claim any originality here for the class named "NIF". Further models like FourierNIF are original.
 """
 import json
 
 import torch
 import torch.nn as nn
-
-import numpy as np
+import torch.fft as fft
 
 #region NIF Definitions
+
 
 class NIF(nn.Module):
 
     def __init__(self, cfg_shape_net, cfg_param_net):
-
         super(NIF, self).__init__()
 
         # Initialize shape network parameters
@@ -22,14 +21,12 @@ class NIF(nn.Module):
         self.shape_i_dim = cfg_shape_net['input_dim']
         self.shape_o_dim = cfg_shape_net['output_dim']
         self.shape_hidden_units = cfg_shape_net['hidden_units']
-        self.shape_num_hidden_layers = cfg_shape_net['num_hidden_layers']
         self.shape_activation = cfg_shape_net.get('shape_activation', nn.Tanh)()
 
         # Initialize paremeter network parameters
         self.cfg_param_net = cfg_param_net
         self.param_i_dim = cfg_param_net['input_dim']
         self.param_hidden_units = cfg_param_net['hidden_units']
-        self.param_num_hidden_layers = cfg_param_net['num_hidden_layers']
         self.param_activation = cfg_param_net.get('param_activation', nn.Tanh)()
 
         self.param_latent_dim = sum(self.shape_hidden_units) + self.shape_o_dim # Define length of latent dim of param net
@@ -105,7 +102,28 @@ class NIF(nn.Module):
         latent_space = self.parameter_network(param_input) # take the latent space from parameter network
 
         return self._call_shape_network(shape_input, latent_space) # call the shape network
+    
+    def save_config(self, filename_config="config.json"):
+        """
+        Saves the NIF model configuration to a JSON file.
 
+        Args:
+            filename (str, optional): The name of the file to save the
+            configuration. Defaults to "config.json".
+        """
+        config = {
+            "cfg_shape_net": self.cfg_shape_net,
+            "cfg_parameter_net": self.cfg_param_net,
+        }
+        with open(filename_config, "w") as write_file:
+            json.dump(config, write_file, indent=4)
+
+
+class FourierNIF(nn.Module):
+
+
+
+    None
         
 #endregion
 
