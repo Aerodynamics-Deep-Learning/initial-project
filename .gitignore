@@ -1,7 +1,12 @@
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
-*$py.class
+*.log
+*.pth
+*.pkl
+*.pt
+*.onnx
+.DS_Store
 
 # Virtual environments
 venv/
