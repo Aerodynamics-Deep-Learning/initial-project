@@ -97,4 +97,4 @@ def seperate_transform(df: pd.DataFrame, target_coord: int):
 
     df = df.to_numpy()
 
-    return torch.from_numpy(df[:,:target_coord]).double(), torch.from_numpy(df[:,target_coord:]).double() # Double precision since problem requires high pres as we comparing real values
+    return torch.from_numpy(df[:,:target_coord]).float(), torch.from_numpy(df[:,target_coord:]).float() # Double precision since problem requires high pres as we comparing real values

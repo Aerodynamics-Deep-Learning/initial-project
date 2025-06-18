@@ -44,6 +44,9 @@ def train_one_epoch(model, optimizer, criterion, inputs, targets, batch_size= 32
 
         running_loss += loss.item() * batch_inputs.size(0)
 
+        print(loss.item())
+        print(f"Rows: {start_index} to {start_index+batch_size-1} calculating")
+
     return running_loss / n_samples
 
 def create_NIF_and_optimizer(cfg_shape_net, cfg_param_net, lr= 0.001):
