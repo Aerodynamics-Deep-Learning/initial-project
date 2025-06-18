@@ -43,10 +43,12 @@ class NIF(nn.Module):
 
         # Add hidden layers
         for i in range(len(self.param_hidden_units)-1):
-            self.p_layers.append(nn.Linear(in_features=self.param_hidden_units[i], out_features=self.param_hidden_units[i+1]), self.param_activation)
+            self.p_layers.append(nn.Linear(in_features=self.param_hidden_units[i], out_features=self.param_hidden_units[i+1]))
+            self.p_layers.append(self.param_activation)
 
         # Add output (latent space) layer
-        self.p_layers.append(nn.Linear(in_features=self.param_hidden_units[-1], out_features=self.param_latent_dim), self.param_activation)
+        self.p_layers.append(nn.Linear(in_features=self.param_hidden_units[-1], out_features=self.param_latent_dim))
+        self.p_layers.append(self.param_activation)
 
         self.parameter_network = nn.Sequential(*self.p_layers)
 
@@ -89,15 +91,15 @@ class NIF(nn.Module):
             latent_slice = latent_space[:, start_offset:start_offset+out_dim] # slice a part of latent space
             out = out * latent_slice # point wise multiply the out and latent space
 
-            out = self.shape_activation(out) # put into the activation function
+            shape_input = self.shape_activation(out) # put into the activation function
             start_offset += out_dim # offset the slicing start
 
-        return out # return the output once done
+        return shape_input # return the output once done
 
     def forward(self, inputs):
 
-        shape_input = inputs[:, :self.param_i_dim-1] #-1 because dim and slice have -1 offset we, input the dims starting from 1 not like indices where they start from 0
-        param_input = inputs[:, self.param_i_dim-1:]
+        shape_input = inputs[:, :self.shape_i_dim]
+        param_input = inputs[:, self.shape_i_dim:]
 
         latent_space = self.parameter_network(param_input) # take the latent space from parameter network
 
