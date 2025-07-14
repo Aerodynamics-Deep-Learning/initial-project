@@ -1,7 +1,5 @@
 import torch
 
-# Import this file after the model file
-
 def compute_loss_with_regularization(model, criterion, outputs, targets, lambda_reg=1e-4):
     base_loss = criterion(outputs, targets)
     
@@ -48,19 +46,4 @@ def train_one_epoch(model, optimizer, criterion, inputs, targets, batch_size= 32
         print(f"Rows: {start_index} to {start_index+batch_size-1} calculating")
 
     return running_loss / n_samples
-
-def create_NIF_and_optimizer(cfg_shape_net, cfg_param_net, lr= 0.001):
-    model = NIF(cfg_shape_net, cfg_param_net)
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-    return model, optimizer
-
-def create_FourierNIF_and_optimizer(cfg_shape_net, cfg_param_net, lr= 0.001):
-    model = FourierNIF(cfg_shape_net, cfg_param_net)
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-    return model, optimizer
-
-def create_MLP_and_optimizer(cfg, lr= 0.001):
-    model = MLP(cfg)
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-    return model, optimizer
 

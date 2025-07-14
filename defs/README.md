@@ -1,0 +1,16 @@
+- Inside models:
+    - NIF:
+        - NIF_Pointwise: A modification on the original NIF where we pointwise multiply the latent space instead of defining layers with it
+        - NIF_PartialPaper: We define only some layers with the latent space
+        - NIF_Paper: We fully define all ShapeNet layers with the latent space
+        - NIF_PaperSiren: The full application of the NIF model shown in the paper, with SIREN layers
+        - NIF_PaperFourier: Where the ParamNet is replaced with an FNO
+    - MLP: A file where we define:
+        - DNN: A regular deep neural net
+    - Literature:
+        - NIF_TF: Direct application of the Paper NIF with TensorFlow
+
+- Inside helper_functions:
+    - data_manipulation_functions: Various different functions to manipulate the input data into tensors
+    - training_functions: Various training functions
+    - create_model_and_optimizer_functions: Various model and optimizer initialization functions

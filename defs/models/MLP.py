@@ -25,4 +25,6 @@ class DNN(nn.Module):
         self.output_size = output_size
         self.hidden_layers = hidden_layers
         self.activation = activation
+
+    None
         
