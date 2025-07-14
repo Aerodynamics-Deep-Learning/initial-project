@@ -16,5 +16,6 @@ venv/
 # Logs and outputs
 *.log
 
-# TensorBoard logs
-runs/
+# Tensorboard logs
+runs/*
+!runs/**/*.ipynb
