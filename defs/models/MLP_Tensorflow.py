@@ -1,147 +1,121 @@
+import os
+import random
+import pathlib
+import numpy as np
+import pandas as pd
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers
-import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
-import pandas as pd
-import json
+
+# optional, used for saving config/scaler
+try:
+    import joblib
+except Exception:
+    joblib = None
 
 
+# --------- Utilities ---------
+def set_seed(seed: int = 42):
+    os.environ["PYTHONHASHSEED"] = str(seed)
+    tf.random.set_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+
+
+# --------- Model ---------
 class MLPRegressor:
-    def __init__(self, cfg_mlp):
+    def __init__(self, cfg_mlp: dict):
         """
-        Initialize MLP for regression with PyTorch-style configuration
-
-        Args:
-            cfg_mlp: Dictionary containing MLP configuration with keys:
-                - 'input_dim': Number of input features (required)
-                - 'output_dim': Number of output targets (required)
-                - 'hidden_units': List of hidden layer sizes (required)
-                - 'activation': Activation function name (optional, default: 'relu')
-                - 'dropout_rate': Dropout rate for regularization (optional, default: 0.2)
-                - 'learning_rate': Learning rate for optimizer (optional, default: 0.001)
-                - 'task_type': 'regression' or 'classification' (optional, default: 'regression')
+        cfg_mlp keys:
+          - input_dim (int, required)
+          - output_dim (int, required)
+          - hidden_units (list[int], required)
+          - activation (str, default 'relu')
+          - dropout_rate (float, default 0.2)
+          - learning_rate (float, default 1e-3)
+          - task_type ('regression'|'classification', default 'regression')
         """
-        # Core parameters
-        self.i_dim = cfg_mlp['input_dim']
-        self.o_dim = cfg_mlp['output_dim']
-        self.hidden_units = cfg_mlp['hidden_units']
+        # Core
+        self.i_dim = int(cfg_mlp["input_dim"])
+        self.o_dim = int(cfg_mlp["output_dim"])
+        self.hidden_units = list(cfg_mlp["hidden_units"])
 
-        # Optional parameters with defaults
-        self.activation_name = cfg_mlp.get('activation', 'relu')
-        self.dropout_rate = cfg_mlp.get('dropout_rate', 0.2)
-        self.learning_rate = cfg_mlp.get('learning_rate', 0.001)
-        self.task_type = cfg_mlp.get('task_type', 'regression')
+        assert self.i_dim > 0 and self.o_dim > 0, "input_dim/output_dim must be > 0"
+        assert len(self.hidden_units) > 0, "hidden_units must be a non-empty list"
 
-        # Map activation names to TensorFlow functions
-        self.activation_map = {
-            'tanh': 'tanh',
-            'relu': 'relu',
-            'sigmoid': 'sigmoid',
-            'elu': 'elu',
-            'swish': 'swish',
-            'gelu': 'gelu'
-        }
+        # Optional
+        self.activation_name = cfg_mlp.get("activation", "relu")
+        self.dropout_rate = float(cfg_mlp.get("dropout_rate", 0.2))
+        self.learning_rate = float(cfg_mlp.get("learning_rate", 1e-3))
+        self.task_type = cfg_mlp.get("task_type", "regression")
 
-        self.activation = self.activation_map.get(self.activation_name.lower(), 'relu')
+        # Keras activation getter (works with strings/functions)
+        self.activation = keras.activations.get(self.activation_name)
 
-        # Model components
+        # State
         self.model = None
         self.history = None
-
-        # Store original config
+        self.scaler = None  # wire from pipeline so we can save it
         self.cfg_mlp = cfg_mlp
 
     def build_model(self):
-        """Build the MLP model for regression or classification"""
-        model = keras.Sequential()
-
-        # Input layer
+        """Build the MLP for regression/classification."""
+        model = keras.Sequential(name="mlp_regressor")
         model.add(layers.Input(shape=(self.i_dim,)))
 
-        # Add input to first hidden layer
-        model.add(layers.Dense(
-            units=self.hidden_units[0],
-            activation=self.activation,
-            name='input_to_hidden_0'
-        ))
-        model.add(layers.Dropout(self.dropout_rate, name='dropout_0'))
+        # First hidden
+        model.add(layers.Dense(self.hidden_units[0], activation=self.activation, name="hidden_0"))
+        model.add(layers.Dropout(self.dropout_rate, name="dropout_0"))
 
-        # Add hidden layers
-        for i in range(len(self.hidden_units) - 1):
-            model.add(layers.Dense(
-                units=self.hidden_units[i + 1],
-                activation=self.activation,
-                name=f'hidden_{i}_to_hidden_{i + 1}'
-            ))
-            model.add(layers.Dropout(self.dropout_rate, name=f'dropout_{i + 1}'))
+        # Additional hiddens
+        for i in range(1, len(self.hidden_units)):
+            model.add(layers.Dense(self.hidden_units[i], activation=self.activation, name=f"hidden_{i}"))
+            model.add(layers.Dropout(self.dropout_rate, name=f"dropout_{i}"))
 
-        # Output layer - different for regression vs classification
-        if self.task_type == 'regression':
-            # Regression: linear activation, MSE loss
-            model.add(layers.Dense(self.o_dim, activation='linear', name='output'))
-            loss = 'mse'
-            metrics = ['mae']
+        # Output
+        if self.task_type == "regression":
+            model.add(layers.Dense(self.o_dim, activation="linear", name="output"))
+            loss = "mse"
+            metrics = ["mae", "mse"]
         else:
-            # Classification: sigmoid/softmax activation
             if self.o_dim == 1 or self.o_dim == 2:
-                model.add(layers.Dense(1, activation='sigmoid', name='output'))
-                loss = 'binary_crossentropy'
-                metrics = ['accuracy']
+                model.add(layers.Dense(1, activation="sigmoid", name="output"))
+                loss = "binary_crossentropy"
+                metrics = ["accuracy"]
             else:
-                model.add(layers.Dense(self.o_dim, activation='softmax', name='output'))
-                loss = 'sparse_categorical_crossentropy'
-                metrics = ['accuracy']
+                model.add(layers.Dense(self.o_dim, activation="softmax", name="output"))
+                loss = "sparse_categorical_crossentropy"
+                metrics = ["accuracy"]
 
-        # Compile model
         model.compile(
             optimizer=keras.optimizers.Adam(learning_rate=self.learning_rate),
             loss=loss,
-            metrics=metrics
+            metrics=metrics,
         )
-
         self.model = model
         return model
 
-    def forward(self, input_data):
-        """Forward pass through the network"""
-        if self.model is None:
-            raise ValueError("Model not built yet. Call build_model() first.")
-        return self.model(input_data)
-
     def train(self, X_train, y_train, X_val=None, y_val=None,
               epochs=100, batch_size=32, verbose=1, early_stopping=True):
-        """Train the MLP model"""
         if self.model is None:
             self.build_model()
 
         callbacks = []
+        monitor_key = "val_loss" if (X_val is not None and y_val is not None) else "loss"
 
         if early_stopping:
-            early_stop = keras.callbacks.EarlyStopping(
-                monitor='val_loss' if X_val is not None else 'loss',
-                patience=15,  # More patience for regression
-                restore_best_weights=True
-            )
-            callbacks.append(early_stop)
+            callbacks.append(keras.callbacks.EarlyStopping(
+                monitor=monitor_key, patience=15, restore_best_weights=True
+            ))
+            callbacks.append(keras.callbacks.ReduceLROnPlateau(
+                monitor=monitor_key, factor=0.5, patience=8, min_lr=1e-6
+            ))
 
-            # Add learning rate reduction for better convergence
-            lr_scheduler = keras.callbacks.ReduceLROnPlateau(
-                monitor='val_loss' if X_val is not None else 'loss',
-                factor=0.5,
-                patience=8,
-                min_lr=1e-6
-            )
-            callbacks.append(lr_scheduler)
+        validation_data = (X_val, y_val) if (X_val is not None and y_val is not None) else None
 
-        # Prepare validation data
-        validation_data = None
-        if X_val is not None and y_val is not None:
-            validation_data = (X_val, y_val)
-
-        # Train the model
         self.history = self.model.fit(
             X_train, y_train,
             validation_data=validation_data,
@@ -150,122 +124,127 @@ class MLPRegressor:
             callbacks=callbacks,
             verbose=verbose
         )
-
         return self.history
 
     def predict(self, X):
-        """Make predictions"""
         if self.model is None:
             raise ValueError("Model not trained yet. Call train() first.")
         return self.model.predict(X)
 
     def evaluate(self, X_test, y_test):
-        """Evaluate model performance"""
         if self.model is None:
             raise ValueError("Model not trained yet. Call train() first.")
         return self.model.evaluate(X_test, y_test)
 
-    def plot_training_history(self):
-        """Plot training history"""
+    def plot_training_history(self, out_path="training_curves.png"):
         if self.history is None:
             raise ValueError("No training history available.")
 
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4))
 
-        # Plot loss
-        ax1.plot(self.history.history['loss'], label='Training Loss')
-        if 'val_loss' in self.history.history:
-            ax1.plot(self.history.history['val_loss'], label='Validation Loss')
-        ax1.set_title('Model Loss')
-        ax1.set_xlabel('Epoch')
-        ax1.set_ylabel('Loss')
-        ax1.legend()
-        ax1.grid(True)
+        # Loss
+        ax1.plot(self.history.history["loss"], label="Train Loss")
+        if "val_loss" in self.history.history:
+            ax1.plot(self.history.history["val_loss"], label="Val Loss")
+        ax1.set_title("Loss")
+        ax1.set_xlabel("Epoch"); ax1.set_ylabel("Loss"); ax1.legend(); ax1.grid(True)
 
-        # Plot metric (MAE for regression, accuracy for classification)
-        metric_name = 'mae' if self.task_type == 'regression' else 'accuracy'
+        # Metric
+        metric_name = "mae" if self.task_type == "regression" else "accuracy"
         if metric_name in self.history.history:
-            ax2.plot(self.history.history[metric_name], label=f'Training {metric_name.upper()}')
-            if f'val_{metric_name}' in self.history.history:
-                ax2.plot(self.history.history[f'val_{metric_name}'], label=f'Validation {metric_name.upper()}')
-            ax2.set_title(f'Model {metric_name.upper()}')
-            ax2.set_xlabel('Epoch')
-            ax2.set_ylabel(metric_name.upper())
-            ax2.legend()
-            ax2.grid(True)
+            ax2.plot(self.history.history[metric_name], label=f"Train {metric_name.upper()}")
+        val_key = f"val_{metric_name}"
+        if val_key in self.history.history:
+            ax2.plot(self.history.history[val_key], label=f"Val {metric_name.upper()}")
+        ax2.set_title(metric_name.upper())
+        ax2.set_xlabel("Epoch"); ax2.set_ylabel(metric_name.upper()); ax2.legend(); ax2.grid(True)
 
         plt.tight_layout()
-        plt.show()
+        plt.savefig(out_path, dpi=180)
+        try:
+            plt.show()
+        except Exception:
+            pass
 
-    def get_model_summary(self):
-        """Get model summary"""
+    def get_model_summary(self) -> str:
         if self.model is None:
             self.build_model()
-        return self.model.summary()
+        lines = []
+        self.model.summary(print_fn=lines.append)
+        return "\n".join(lines)
+
+    # ---- persistence (optional) ----
+    def save(self, out_dir="artifacts"):
+        p = pathlib.Path(out_dir)
+        p.mkdir(parents=True, exist_ok=True)
+        self.model.save(p / "model.keras")
+        if joblib is not None:
+            joblib.dump(self.cfg_mlp, p / "cfg.pkl")
+            if self.scaler is not None:
+                joblib.dump(self.scaler, p / "scaler.pkl")
+
+    @staticmethod
+    def load(out_dir="artifacts"):
+        p = pathlib.Path(out_dir)
+        model = keras.models.load_model(p / "model.keras")
+        obj = MLPRegressor({"input_dim": 1, "output_dim": 1, "hidden_units": [1]})  # temp
+        obj.model = model
+        if joblib is not None and (p / "cfg.pkl").exists():
+            obj.cfg_mlp = joblib.load(p / "cfg.pkl")
+        if joblib is not None and (p / "scaler.pkl").exists():
+            obj.scaler = joblib.load(p / "scaler.pkl")
+        return obj
 
 
-# Airfoil data loading functions
-def parse_coordinate_string(coord_str):
-    """Parse coordinate string like "(1.000000,-0.003530)" """
-    clean_str = coord_str.strip('()')
-    x, y = clean_str.split(',')
-    return float(x), float(y)
+# --------- Data loading ---------
+def parse_coordinate_series(s: pd.Series):
+    """Vectorized parse for strings like '(x,y)' -> two float arrays."""
+    split = s.astype(str).str.strip("()").str.split(",", n=1, expand=True)
+    x = pd.to_numeric(split[0], errors="coerce").fillna(0.0).values
+    y = pd.to_numeric(split[1], errors="coerce").fillna(0.0).values
+    return x, y
 
 
 def load_airfoil_data(file_path, target_columns=None):
-    """Load airfoil CSV data with coordinate points"""
+    """Load airfoil CSV data with coordinate points."""
     print(f"Loading airfoil data from: {file_path}")
 
     if target_columns is None:
-        target_columns = ['C_d', 'C_l', 'C_m']
+        target_columns = ["C_d", "C_l", "C_m"]
 
     try:
-        # Load CSV
         df = pd.read_csv(file_path)
         print(f" Data loaded: {df.shape}")
 
-        # Get coordinate columns (p0, p1, ..., p14)
-        coord_cols = [col for col in df.columns if col.startswith('p') and col[1:].isdigit()]
+        # coordinate columns: p0, p1, ...
+        coord_cols = [c for c in df.columns if c.startswith("p") and c[1:].isdigit()]
         coord_cols.sort(key=lambda x: int(x[1:]))
 
-        # Parse coordinates into features
-        feature_data = []
-        feature_names = []
-
+        feature_data, feature_names = [], []
         for col in coord_cols:
-            x_coords = []
-            y_coords = []
-
-            for coord_str in df[col]:
-                x, y = parse_coordinate_string(coord_str)
-                x_coords.append(x)
-                y_coords.append(y)
-
+            x_coords, y_coords = parse_coordinate_series(df[col])
             feature_data.extend([x_coords, y_coords])
             feature_names.extend([f"{col}_x", f"{col}_y"])
 
-        # Add flow conditions
-        flow_cols = ['Re', 'Mach', 'AoA_deg']
-        for col in flow_cols:
+        # flow conditions
+        for col in ["Re", "Mach", "AoA_deg"]:
             if col in df.columns:
                 feature_data.append(df[col].values)
                 feature_names.append(col)
 
-        # Create feature matrix
-        X = np.column_stack(feature_data)
+        X = np.column_stack(feature_data).astype(np.float32)
 
-        # Extract targets
-        y_data = []
-        available_targets = []
+        # targets
+        y_data, available_targets = [], []
+        for t in target_columns:
+            if t in df.columns:
+                y_data.append(df[t].values)
+                available_targets.append(t)
+        if not y_data:
+            raise ValueError("None of the target columns were found in the CSV.")
+        y = np.column_stack(y_data).astype(np.float32) if len(y_data) > 1 else np.array(y_data[0], dtype=np.float32)
 
-        for target in target_columns:
-            if target in df.columns:
-                y_data.append(df[target].values)
-                available_targets.append(target)
-
-        y = np.column_stack(y_data) if len(y_data) > 1 else y_data[0]
-
-        print(f"Features: {X.shape}, Targets: {len(available_targets)}")
+        print(f"Features: {X.shape}, Targets: {len(available_targets)} -> {available_targets}")
         return X, y, feature_names, available_targets, df
 
     except Exception as e:
@@ -273,50 +252,47 @@ def load_airfoil_data(file_path, target_columns=None):
         return None, None, None, None, None
 
 
-def train_airfoil_mlp(file_path, target_columns=['C_d'], epochs=150):
-    """Complete pipeline for airfoil MLP training"""
+# --------- Training pipeline ---------
+def train_airfoil_mlp(file_path, target_columns=["C_d"], epochs=150):
+    """Complete pipeline for airfoil MLP training."""
+    set_seed(42)
 
-    # Load data
     result = load_airfoil_data(file_path, target_columns)
     if result[0] is None:
         return None, None
-
     X, y, feature_names, target_names, df = result
 
-    # Split data
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-    X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.2, random_state=42)
+    X_train, X_val,  y_train, y_val  = train_test_split(X_train, y_train, test_size=0.2, random_state=42)
 
-    # Scale features
     scaler = StandardScaler()
-    X_train_scaled = scaler.fit_transform(X_train)
-    X_val_scaled = scaler.transform(X_val)
-    X_test_scaled = scaler.transform(X_test)
+    X_train_scaled = scaler.fit_transform(X_train).astype(np.float32)
+    X_val_scaled   = scaler.transform(X_val).astype(np.float32)
+    X_test_scaled  = scaler.transform(X_test).astype(np.float32)
 
     print(f"Training: {X_train_scaled.shape}, Validation: {X_val_scaled.shape}, Test: {X_test_scaled.shape}")
 
-    # Configure MLP for regression
     cfg_mlp = {
-        'input_dim': X_train_scaled.shape[1],
-        'output_dim': len(target_names),
-        'hidden_units': [256, 128, 64, 32],  # Deep network for complex aerodynamics
-        'activation': 'relu',
-        'dropout_rate': 0.2,
-        'learning_rate': 0.001,
-        'task_type': 'regression'  # Key difference!
+        "input_dim": X_train_scaled.shape[1],
+        "output_dim": len(target_names),
+        "hidden_units": [256, 128, 64, 32],
+        "activation": "relu",
+        "dropout_rate": 0.2,
+        "learning_rate": 1e-3,
+        "task_type": "regression",
     }
 
-    print(f"\n MLP Configuration:")
+    print("\n MLP Configuration:")
     print(f"  Task: Regression (Airfoil → {target_names})")
     print(f"  Input: {cfg_mlp['input_dim']} features (airfoil coords + flow conditions)")
     print(f"  Output: {cfg_mlp['output_dim']} targets")
     print(f"  Architecture: {cfg_mlp['hidden_units']}")
 
-    # Create and train MLP
-    mlp = MLPRegressor(cfg_mlp)  # Use MLPRegressor!
+    mlp = MLPRegressor(cfg_mlp)
+    mlp.scaler = scaler  # keep for saving later
 
-    print(f"\n Training on M2 Mac...")
-    history = mlp.train(
+    print("\n Training...")
+    mlp.train(
         X_train_scaled, y_train,
         X_val_scaled, y_val,
         epochs=epochs,
@@ -324,66 +300,58 @@ def train_airfoil_mlp(file_path, target_columns=['C_d'], epochs=150):
         verbose=1
     )
 
-    # Evaluate
-    test_loss, test_mae = mlp.evaluate(X_test_scaled, y_test)
-    print(f"\n Results:")
-    print(f"  Test MSE: {test_loss:.8f}")
-    print(f"  Test MAE: {test_mae:.8f}")
+    results = mlp.evaluate(X_test_scaled, y_test)
+    if isinstance(results, (list, tuple)) and len(results) >= 2:
+        test_loss, test_mae = results[0], results[1]
+    else:
+        test_loss, test_mae = results, np.nan
 
-    # Show predictions
-    predictions = mlp.predict(X_test_scaled[:5])
-    print(f"\nSample Predictions vs Actual:")
-    for i in range(min(5, len(predictions))):
+    print("\n Results:")
+    print(f"  Test MSE: {test_loss:.8f}")
+    if not np.isnan(test_mae):
+        print(f"  Test MAE: {test_mae:.8f}")
+
+    # Sample predictions
+    preds = mlp.predict(X_test_scaled[:5])
+    print("\nSample Predictions vs Actual:")
+    for i in range(min(5, len(preds))):
         if len(target_names) == 1:
-            pred = predictions[i] if predictions.ndim == 1 else predictions[i][0]
-            actual = y_test[i] if y_test.ndim == 1 else y_test[i]
-            print(f"  {target_names[0]}: Pred={pred:.6f}, Actual={actual:.6f}")
+            pred = preds[i] if preds.ndim == 1 else preds[i][0]
+            actual = y_test[i] if y_test.ndim == 1 else y_test[i][0]
+            print(f"  {target_names[0]}: Pred={float(pred):.6f}, Actual={float(actual):.6f}")
         else:
             print(f"  Sample {i + 1}:")
-            for j, target in enumerate(target_names):
-                print(f"    {target}: Pred={predictions[i][j]:.6f}, Actual={y_test[i][j]:.6f}")
+            for j, t in enumerate(target_names):
+                print(f"    {t}: Pred={float(preds[i][j]):.6f}, Actual={float(y_test[i][j]):.6f}")
 
-    # Plot training
     mlp.plot_training_history()
 
     return mlp, {
-        'X_test': X_test_scaled, 'y_test': y_test,
-        'scaler': scaler, 'feature_names': feature_names,
-        'target_names': target_names
+        "X_test": X_test_scaled, "y_test": y_test,
+        "scaler": scaler, "feature_names": feature_names,
+        "target_names": target_names
     }
 
 
-# Ready-to-use example
-def main_airfoil_example():
-    """Main function for airfoil aerodynamics prediction"""
-    print("AIRFOIL AERODYNAMICS MLP - M2 OPTIMIZED")
-    print("=" * 50)
+# --------- CLI entrypoint ---------
+def main():
+    import argparse
+    parser = argparse.ArgumentParser(description="Airfoil aerodynamics MLP")
+    parser.add_argument("--csv", type=str, required=True, help="Path to airfoil CSV file")
+    parser.add_argument("--targets", type=str, default="C_d", help="Comma-separated list (e.g., C_d,C_l,C_m)")
+    parser.add_argument("--epochs", type=int, default=150)
+    args = parser.parse_args()
 
-    # Get file path
-    file_path = input("Enter path to your airfoil CSV file: ").strip()
-    if not file_path:
-        print("Using synthetic data for demo...")
-        return
-
-    # Choose targets
-    print("\nWhat to predict?")
-    print("1. Drag coefficient (C_d)")
-    print("2. All coefficients (C_d, C_l, C_m)")
-    choice = input("Choice (1 or 2): ").strip()
-
-    targets = ['C_d'] if choice == '1' else ['C_d', 'C_l', 'C_m']
-
-    # Train model
-    print(f"\n Training MLP to predict: {targets}")
-    mlp, data = train_airfoil_mlp(file_path, target_columns=targets, epochs=150)
-
+    targets = [t.strip() for t in args.targets.split(",") if t.strip()]
+    mlp, _ = train_airfoil_mlp(args.csv, target_columns=targets, epochs=args.epochs)
     if mlp:
-        print("\n SUCCESS! Your airfoil aerodynamics model is ready!")
-        print("This model learned the relationship: Airfoil Shape + Flow → Aerodynamics")
-        return mlp, data
-
-    return None, None
+        mlp.save("artifacts")
+        print("Saved model/config to ./artifacts")
 
 
 if __name__ == "__main__":
-    model, data = main_airfoil_example()
+    # If you want pure CPU for reproducibility, uncomment next line:
+    # tf.config.set_visible_devices([], 'GPU')
+    print("AIRFOIL AERODYNAMICS MLP")
+    print("=" * 50)
+    main()
