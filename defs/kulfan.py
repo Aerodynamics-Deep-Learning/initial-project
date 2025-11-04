@@ -9,7 +9,7 @@ def to_cst_coeff_section(section:(np.array), N:(int)= 8, N1:(float)= 0.5, N2:(fl
 
     Args:
         section (np.array): An (2, m) array of the (x, y) coordinates of the section
-        N (int): The order of Bernstein polynomials, def = 8
+        N (int): The order of Bernstein polynomials, def = 8, coeffs will be +1
         N1 (float): Leading edge exponent in the Class Function, def = 0.5
         N2 (float): Trailing edge exponent in the Class Function, def = 1.0
 
@@ -60,7 +60,7 @@ def to_cst_coeff_section(section:(np.array), N:(int)= 8, N1:(float)= 0.5, N2:(fl
 
     Bernstein_coeff_section, residuals, rank, s = np.linalg.lstsq(A, Y, rcond=None)
 
-    return Bernstein_coeff_section
+    return Bernstein_coeff_section, te_y
 
 def to_cst_coeff_airfoil(airfoil:(np.array), N:(int)= 8, N1:(float)= 0.5, N2:(float)= 1.0):
 
@@ -70,7 +70,7 @@ def to_cst_coeff_airfoil(airfoil:(np.array), N:(int)= 8, N1:(float)= 0.5, N2:(fl
 
     Args:
         airfoil (np.array): An (2, m) array of the coordinates of the entire airfoil [0,:] is x coords, [1,:] is y coords
-        N (int): The order of Bernstein polynomials, def = 8
+        N (int): The order of Bernstein polynomials, def = 8, coeffs will be +1
         N1 (float): Leading edge exponent in the Class Function, def = 0.5
         N2 (float): Trailing edge exponent in the Class Function, def = 1.0
     
@@ -88,19 +88,83 @@ def to_cst_coeff_airfoil(airfoil:(np.array), N:(int)= 8, N1:(float)= 0.5, N2:(fl
                                                    # then goes to leading edge through the lower part, so, upper's order is correct but lower must be flipped
     airfoil_upper = airfoil[:,mid_point:] # This gets the upper part of the airfoil
 
-    Bernstein_lower = to_cst_coeff_section(section=airfoil_lower, N=N, N1=N1, N2=N2)
-    Bernstein_upper = to_cst_coeff_section(section=airfoil_upper, N=N, N1=N1, N2=N2)
+    Bernstein_lower, te_y_lower = to_cst_coeff_section(section=airfoil_lower, N=N, N1=N1, N2=N2)
+    Bernstein_upper, te_y_upper = to_cst_coeff_section(section=airfoil_upper, N=N, N1=N1, N2=N2)
 
-    Kulfan_total = np.hstack((Bernstein_upper, Bernstein_upper, np.array([N1, N2])))
+    Kulfan_total = np.hstack((Bernstein_upper, Bernstein_lower, np.array([N1, N2, te_y_upper, te_y_lower])))
     Bernstein_airfoil = np.hstack((Bernstein_upper, Bernstein_lower))
 
     return Kulfan_total, Bernstein_airfoil, Bernstein_upper, Bernstein_lower
 
-def to_coords_section():
+def to_coords_section(B:(np.array), N:(int), N1:(float), N2:(float), y_te:(float), num_points:(int)):
 
     """
-    Transforms the Bernstein coefficients into 
+    Transforms the Bernstein coefficients into regular coords given
+
+    Args:
+        B (np.array): An (N+1,) array of Bernstein coefficients
+        N (int): The order of max Bernstein polynomial that was used
+        N1 (float): Leading edge exponent in the Class Function
+        N2 (float): Trailing edge exponent in the Class Function
+        y_te (float): The y-coordinate of the section's trailing edge
+        num_points (int): The number of that will be used to reconstruct
     """
 
+    x = np.linspace(0,1,num_points)
 
-    pass
+    # Class function
+    C_x = (x**N1) * ((1-x)**N2)
+
+    # Shape function
+    S_x = np.zeros_like(x)
+
+    # This gets us the S(x)
+    num_coeffs = N+1
+    for i in range(num_coeffs):
+        K_i = comb(N, i) * (x**i) * ((1-x)**(N-i))
+        S_x += B[i] * K_i # We add the sum terms to the entire x vector each time
+
+    # Get y(x)
+    y_x = C_x * S_x + x * y_te
+
+    # Compile them into a single coord matrix
+    section = np.vstack((x, y_x))
+
+    return section
+
+def to_coords_airfoil(Kulfan_total:(np.array), N:(int), num_points:(int)):
+
+    """
+    Reconstructs the entire airfoil and returns an array of the airfoil where [0] is the x-coords and [1] is y-coords. 
+    The coords start from TE of lower, goes to LE, then ends at TE of upper, this is how our airfoil datasets are.
+
+    Args:
+        Kulfan_total (np.array): 'Kulfan_total' output of to_cst_coeff_airfoil
+        N (int): The order of polynomials used while calculating the cst form
+        num_points (int): Total number of points per section that will be used to reconstruct
+
+    Returns:
+        airfoil (np.array): The np.array of the entire airfoil
+        upper_section (np.array): The np.array of the upper section of the airfoil
+        lower_section (np.array): The np.array of the lower section of the airfoil
+    """
+
+    # Unpack all the values, assuming to kullfan was done by to_cst_coeff_airfoil function
+    num_coeffs = N+1
+    B_upper = Kulfan_total[:num_coeffs]
+    B_lower = Kulfan_total[num_coeffs:2*num_coeffs]
+    N1 = Kulfan_total[2*num_coeffs]
+    N2 = Kulfan_total[2*num_coeffs + 1]
+    te_y_upper = Kulfan_total[2*num_coeffs + 2]
+    te_y_lower = Kulfan_total[2*num_coeffs + 3]
+
+    upper_section = to_coords_section(B=B_upper, N=N, N1=N1, N2=N2, y_te=te_y_upper, num_points=num_points)
+    lower_section = to_coords_section(B=B_lower, N=N, N1=N1, N2=N2, y_te=te_y_lower, num_points=num_points)
+
+    # We must flip the section to match the assumed dataset
+    lower_section = np.flip(lower_section, axis=1)
+
+    # Combine them to get the airfoil matrix back, starts with TE of lower, goes to LE, ends at TE of upper
+    airfoil = np.hstack((lower_section, upper_section))
+
+    return airfoil, upper_section, lower_section
