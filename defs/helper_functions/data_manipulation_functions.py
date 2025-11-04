@@ -82,7 +82,8 @@ def datareform_tuple_coordinates(df: pd.DataFrame, which_coord: str = "y"):
     else:
         raise Exception("Entered unsupported which_coord entry")
 
-def seperate_transform(df: pd.DataFrame, target_coord: int):
+
+def seperate_transform(df:(pd.DataFrame), target_coord:(int)):
     """
     Makes the necessary changes to the dataset to get target tensor and input tensor.
 
@@ -98,3 +99,32 @@ def seperate_transform(df: pd.DataFrame, target_coord: int):
     df = df.to_numpy()
 
     return torch.from_numpy(df[:,:target_coord]).float(), torch.from_numpy(df[:,target_coord:]).float() # Double precision since problem requires high pres as we comparing real values
+
+
+def kulfan_dataframe(df:(pd.DataFrame), airfoil_pts:(int), N:(int), N1:(float)=0.5, N2:(float)=1):
+
+    """
+    Takes in an entire dataframe, and then replaces the airfoil coordiniates with the Kulfan form coefficients.
+    To make things faster, it creates a dictionary of airfoil coordinates, and if the coeffs for that airfoil 
+    has been calculated before, it just picks the coeffs from the dictionary. Returns the modified dataframe.
+
+    Args:
+        df (pd.DataFrame): The dataframe of the airfoil dataset
+        airfoil_pts (int): How many airfoil points are in the dataset
+        N (int): The order of Bernstein polynomials that'll be used to make the transformation
+        N1 (float): Leading edge exponent in the Class Function, def = 0.5 for subsonic airfoils
+        N2 (float): Trailing edge exponent in the Class Function, def = 1.0 for subsonic airfoils
+
+    Returns:
+        df_kulfan (pd.DataFrame): The modified dataframe which has 
+            - First row as the arbitrary name of the airfoil
+            - Following rows as the Bernstein coefficients (upper and lower), N1, N2, and y_TE (upper and lower)
+            - Following rows as the system conditions (Re, Mach, AoA, etc.)
+            - Following rows as the target values (Cd, Cl, Cm, etc.)
+    """
+
+    
+
+
+    pass
+
