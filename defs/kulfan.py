@@ -1,5 +1,7 @@
 import numpy as np 
 from scipy.special import comb
+import pandas as pd
+import logging
 
 def to_cst_coeff_section(section:(np.array), N:(int)= 8, N1:(float)= 0.5, N2:(float)= 1.0):
 
@@ -91,7 +93,7 @@ def to_cst_coeff_airfoil(airfoil:(np.array), N:(int)= 8, N1:(float)= 0.5, N2:(fl
     Bernstein_lower, te_y_lower = to_cst_coeff_section(section=airfoil_lower, N=N, N1=N1, N2=N2)
     Bernstein_upper, te_y_upper = to_cst_coeff_section(section=airfoil_upper, N=N, N1=N1, N2=N2)
 
-    Kulfan_total = np.hstack((Bernstein_upper, Bernstein_lower, np.array([N1, N2, te_y_upper, te_y_lower])))
+    Kulfan_total = np.hstack((Bernstein_upper, Bernstein_lower, np.array([te_y_upper, te_y_lower, N1, N2])))
     Bernstein_airfoil = np.hstack((Bernstein_upper, Bernstein_lower))
 
     return Kulfan_total, Bernstein_airfoil, Bernstein_upper, Bernstein_lower
@@ -153,10 +155,10 @@ def to_coords_airfoil(Kulfan_total:(np.array), N:(int), num_points:(int)):
     num_coeffs = N+1
     B_upper = Kulfan_total[:num_coeffs]
     B_lower = Kulfan_total[num_coeffs:2*num_coeffs]
-    N1 = Kulfan_total[2*num_coeffs]
-    N2 = Kulfan_total[2*num_coeffs + 1]
-    te_y_upper = Kulfan_total[2*num_coeffs + 2]
-    te_y_lower = Kulfan_total[2*num_coeffs + 3]
+    te_y_upper = Kulfan_total[2*num_coeffs]
+    te_y_lower = Kulfan_total[2*num_coeffs + 1]
+    N1 = Kulfan_total[2*num_coeffs + 2]
+    N2 = Kulfan_total[2*num_coeffs + 3]
 
     upper_section = to_coords_section(B=B_upper, N=N, N1=N1, N2=N2, y_te=te_y_upper, num_points=num_points)
     lower_section = to_coords_section(B=B_lower, N=N, N1=N1, N2=N2, y_te=te_y_lower, num_points=num_points)
@@ -168,3 +170,195 @@ def to_coords_airfoil(Kulfan_total:(np.array), N:(int), num_points:(int)):
     airfoil = np.hstack((lower_section, upper_section))
 
     return airfoil, upper_section, lower_section
+
+
+def kulfan_dataframe(df:(pd.DataFrame), new_str:(str), airfoil_pts:(int), N:(int), N1:(float)=0.5, N2:(float)=1, df_output:(bool) = False):
+
+    """
+    Takes in an entire dataframe, and then replaces the airfoil coordiniates with the Kulfan form coefficients.
+    To make things faster, it creates a dictionary of airfoil coordinates, and if the coeffs for that airfoil 
+    has been calculated before, it just picks the coeffs from the dictionary. Returns the modified dataframe.
+
+    Args:
+        df (pd.DataFrame): The dataframe of the airfoil dataset
+        new_str (str): The str of the path of where the new file created will be saved
+        airfoil_pts (int): How many airfoil points are in the dataset
+        N (int): The order of Bernstein polynomials that'll be used to make the transformation
+        N1 (float): Leading edge exponent in the Class Function, def = 0.5 for subsonic airfoils
+        N2 (float): Trailing edge exponent in the Class Function, def = 1.0 for subsonic airfoils
+        df_output (bool): If the df will be output by this function
+
+    Returns:
+        df_kulfan (pd.DataFrame): The modified dataframe which has 
+            - First row as the arbitrary name of the airfoil
+            - Following rows as the Bernstein coefficients (upper and lower), N1, N2, and y_TE (upper and lower)
+            - Following rows as the system conditions (Re, Mach, AoA, etc.)
+            - Following rows as the target values (Cd, Cl, Cm, etc.)
+    """
+
+    """
+    A dictionary of Kulfan forms is with respect to different airfoil strs, to avoid constantly re-calculating
+    Kulfan forms. Then, the entire df is being run through to create the df_kulfan, which is then saved as a csv,
+    or can be returned if required.
+    """
+
+    # Iterate through the df to gradually build up the landmark_to_kf_dict
+
+    landmark_to_kf_dict = dict()
+    point_columns = [f'p{i}' for i in range(airfoil_pts)]
+
+    for index, row in df.iterrows():
+
+        if row['airfoil_name'] not in landmark_to_kf_dict.keys():
+
+            data_str = row[point_columns] # Get the str data
+            parsed_data = data_str.str.strip("()").str.split(",", expand=True) # Remove the stuff
+            airfoil_array = parsed_data.astype(float).values.T # Make it into an array, transpose
+            kulfan_total, _, _, _= to_cst_coeff_airfoil(airfoil=airfoil_array, N=N, N1=N1, N2=N2) # Get the Kulfan form details
+
+            landmark_to_kf_dict[row['airfoil_name']] = kulfan_total
+
+        else:
+            continue
+    
+    logging.info('The landmark_to_kf_dict has been made')
+
+    # Create the new dataframe's columns
+    kulfan_template = ([rf'Bu_{i}' for i in range(N+1)] +
+             [rf'Bl_{i}' for i in range(N+1)] +
+             ['te_y_upper', 'te_y_lower', 'N1', 'N2'])
+    
+    targets_template = ['Reynolds', 'Mach', 'AoA', 'Cd', 'Cl', 'Cm']
+    
+    new_df_cols = [
+        'airfoil_name',
+        *kulfan_total,
+        *targets_template
+    ]
+
+    new_df = pd.DataFrame(columns=new_df_cols)
+
+    logging.info('New dict has been made')
+
+    for index, row in df.iterrows():
+
+        new_row = {}
+        new_row['airfoil_name'] = row['airfoil_name']
+        kulfan_vals = landmark_to_kf_dict[new_row['airfoil_name']]
+
+        for i in range(len(kulfan_template)):
+            new_row[f'{kulfan_template[i]}'] = kulfan_vals[i]
+
+        for i in targets_template:
+            new_row[f'{i}'] = row[i]
+
+        new_row = pd.DataFrame([new_row])
+        new_df = pd.concat([df, new_row], ignore_index= True)
+
+        logging.info(f'The following row has been added: {new_row}')
+    
+    logging.info('The df is finished')
+
+    new_df.to_csv(new_str)
+
+    logging.info(f'CSV file has been created at: {new_str}')
+
+    if df_output:
+        return new_df
+
+
+def optimized_kulfan_dataframe(df:(pd.DataFrame), new_str:(str), airfoil_pts:(int), N:(int), N1:(float)=0.5, N2:(float)=1, df_output:(bool) = False):
+
+    """
+    Takes in an entire dataframe, and then replaces the airfoil coordiniates with the Kulfan form coefficients.
+    To make things faster, it creates a dictionary of airfoil coordinates, and if the coeffs for that airfoil 
+    has been calculated before, it just picks the coeffs from the dictionary. Returns the modified dataframe.
+
+    Args:
+        df (pd.DataFrame): The dataframe of the airfoil dataset
+        new_str (str): The str of the path of where the new file created will be saved
+        airfoil_pts (int): How many airfoil points are in the dataset
+        N (int): The order of Bernstein polynomials that'll be used to make the transformation
+        N1 (float): Leading edge exponent in the Class Function, def = 0.5 for subsonic airfoils
+        N2 (float): Trailing edge exponent in the Class Function, def = 1.0 for subsonic airfoils
+        df_output (bool): If the df will be output by this function
+
+    Returns:
+        df_kulfan (pd.DataFrame): The modified dataframe which has 
+            - First row as the arbitrary name of the airfoil
+            - Following rows as the Bernstein coefficients (upper and lower), N1, N2, and y_TE (upper and lower)
+            - Following rows as the system conditions (Re, Mach, AoA, etc.)
+            - Following rows as the target values (Cd, Cl, Cm, etc.)
+    """
+
+    """
+    A dictionary of Kulfan forms is with respect to different airfoil strs, to avoid constantly re-calculating
+    Kulfan forms. Then, the entire df is being run through to create the df_kulfan, which is then saved as a csv,
+    or can be returned if required.
+    """
+
+    # Iterate through the df to gradually build up the landmark_to_kf_dict
+
+    landmark_to_kf_dict = dict()
+    point_columns = [f'p{i}' for i in range(airfoil_pts)]
+
+    for index, row in df.iterrows():
+
+        if row['airfoil_name'] not in landmark_to_kf_dict.keys():
+
+            data_str = row[point_columns] # Get the str data
+            parsed_data = data_str.str.strip("()").str.split(",", expand=True) # Remove the stuff
+            airfoil_array = parsed_data.astype(float).values.T # Make it into an array, transpose
+            kulfan_total, _, _, _= to_cst_coeff_airfoil(airfoil=airfoil_array, N=N, N1=N1, N2=N2) # Get the Kulfan form details
+
+            landmark_to_kf_dict[row['airfoil_name']] = kulfan_total
+
+        else:
+            continue
+    
+    logging.info('The landmark_to_kf_dict has been made')
+
+    kulfan_template_cols = ([rf'Bu_{i}' for i in range(N+1)] +
+             [rf'Bl_{i}' for i in range(N+1)] +
+             ['te_y_upper', 'te_y_lower', 'N1', 'N2'])
+    
+
+    # Create the Kulfan DataFrame from the dictionary in one go
+    kulfan_df = pd.DataFrame.from_dict(
+        landmark_to_kf_dict, 
+        orient='index', 
+        columns=kulfan_template_cols
+    )
+    # Make 'airfoil_name' a column for merging
+    kulfan_df = kulfan_df.reset_index().rename(columns={'index': 'airfoil_name'})
+
+    logging.info('Kulfan coefficient DataFrame has been made')
+
+    # --- 3. Merge and Create Final DataFrame ---
+
+    # OPTIMIZATION 2: Replace the entire second loop with a single, fast merge.
+    # This joins the Kulfan coeffs to every matching row in the original df.
+    final_df = pd.merge(df, kulfan_df, on='airfoil_name', how='left')
+    
+    # --- 4. Select Final Columns ---
+    
+    # Define the columns you want to keep in the final output
+    targets_template = ['Reynolds', 'Mach', 'AoA', 'Cd', 'Cl', 'Cm']
+    
+    # This creates the final, clean DataFrame by selecting only the columns you want
+    final_column_order = ['airfoil_name'] + kulfan_template_cols + targets_template
+    
+    # Filter the merged df to only these columns
+    final_df = final_df[final_column_order]
+    
+    logging.info('The final DataFrame has been merged and cleaned')
+
+    # --- 5. Save and Return ---
+    
+    # index=False is usually desired when saving CSVs
+    final_df.to_csv(new_str, index=False) 
+
+    logging.info(f'CSV file has been created at: {new_str}')
+
+    if df_output:
+        return final_df
