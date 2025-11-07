@@ -40,15 +40,16 @@ class MLP(nn.Module):
             self.layers.append(nn.Linear(in_features=self.hidden_units[i], out_features=self.hidden_units[i+1]))
             self.layers.append(self.activation)
 
-        # Add output (latent space) layer
-        self.layers.append(nn.Linear(in_features=self.hidden_units[-1], out_features=self.latent_dim))
-        self.layers.append(self.activation)
+        # Add output layer
+        self.layers.append(nn.Linear(in_features=self.hidden_units[-1], out_features=self.o_dim))
 
         self.mlp = nn.Sequential(*self.layers)
 
-    def forward(self, input):
+    def forward(self, shape_input, param_input):
+
+        input_tensor = torch.cat((shape_input, param_input), dim=1)
 
         # Return the forward prop
 
-        return self.mlp(input)
+        return self.mlp(input_tensor)
         

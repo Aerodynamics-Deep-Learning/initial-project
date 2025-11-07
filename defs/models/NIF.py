@@ -48,7 +48,6 @@ class NIF_Pointwise(nn.Module):
 
         # Add output (latent space) layer
         self.p_layers.append(nn.Linear(in_features=self.param_hidden_units[-1], out_features=self.param_latent_dim))
-        self.p_layers.append(self.param_activation)
 
         self.parameter_network = nn.Sequential(*self.p_layers)
 
@@ -84,22 +83,26 @@ class NIF_Pointwise(nn.Module):
 
         self.total_units = self.shape_hidden_units + [self.shape_o_dim] # add the output dim since we have as many outputs as the hidden units + output layer
 
-        for layer, out_dim in zip(self.shape_network, self.total_units):
+        num_layers = len(self.shape_network)
+
+        for i, (layer, out_dim) in enumerate(zip(self.shape_network, self.total_units)):
 
             out = layer(shape_input) # take the result from layer
 
             latent_slice = latent_space[:, start_offset:start_offset+out_dim] # slice a part of latent space
             out = out * latent_slice # point wise multiply the out and latent space
 
-            shape_input = self.shape_activation(out) # put into the activation function
+            if i < num_layers - 1:
+                shape_input = self.shape_activation(out) # put into the activation function
+
+            else:
+                shape_input = out
+        
             start_offset += out_dim # offset the slicing start
 
         return shape_input # return the output once done
 
-    def forward(self, inputs):
-
-        shape_input = inputs[:, :self.shape_i_dim]
-        param_input = inputs[:, self.shape_i_dim:]
+    def forward(self, shape_input, param_input):
 
         latent_space = self.parameter_network(param_input) # take the latent space from parameter network
 
@@ -214,10 +217,7 @@ class NIF_PartialPaper(nn.Module):
 
         return out # return the output once done
 
-    def forward(self, inputs):
-
-        shape_input = inputs[:, :self.shape_i_dim]
-        param_input = inputs[:, self.shape_i_dim:]
+    def forward(self, shape_input, param_input):
 
         latent_space = self.parameter_network(param_input) # take the latent space from parameter network
 
