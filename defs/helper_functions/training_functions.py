@@ -86,7 +86,7 @@ def train(cfg_train:(dict), model:(torch.nn.Module), optimizer:(torch.optim), lo
             optimizer.step()
 
             # Log results
-            print(f'Epoch {epoch} | Train run {_+1} loss: {loss}')
+            # print(f'Epoch {epoch} | Train run {_+1} loss: {loss}'); don't show this for now, makes things shitty
             total_train_loss += loss.item()
             collector_dict['losses']['train'].append(loss.item())
 

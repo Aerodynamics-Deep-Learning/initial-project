@@ -1,0 +1,97 @@
+import matplotlib.pyplot as plt
+import numpy as np
+
+def all_plots_ex_analysis(model_name, model_type, collector_dict, index):
+
+    train_losses = collector_dict['losses']['train'].numpy()
+    plt.scatter(index, train_losses, s=0.5)
+    plt.xlabel('Training step')
+    plt.ylabel('Loss (MSE)')
+    plt.title(f'Model: {model_name} | Training loss over time')
+    plt.grid()
+    plt.savefig(rf"plots\{model_type}\{model_name}\train_time.png", dpi=300, bbox_inches='tight')
+    plt.clf()
+
+    tot_train_losses = collector_dict['losses']['total_train'].numpy()/1000
+    val_losses = collector_dict['losses']['val'].numpy()
+    index = np.arange(100)
+    plt.plot(index, val_losses, label='Val Losses')
+    plt.plot(index, tot_train_losses, label= 'Tot Train Losses / 1000, Average Train Losses')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss (MSE)')
+    plt.title(f'Model: {model_name} | Validation and average training over epochs')
+    plt.legend()
+    plt.grid()
+    plt.savefig(rf"plots\{model_type}\{model_name}\val_train_epoch.png", dpi=300, bbox_inches='tight')
+    plt.clf()
+
+    # True vs pred plots
+
+    ranger = np.linspace(collector_dict['actual']['test'][:,0].cpu().min(), collector_dict['actual']['test'][:,0].cpu().max(), 10000)
+    plt.scatter(collector_dict['actual']['test'][:,0].cpu().numpy(), collector_dict['preds']['test'][:,0].cpu().numpy(), s=0.5)
+    plt.plot(ranger, ranger, color='k', label='goalline')
+    plt.xlabel('Actual Cd')
+    plt.ylabel('Predicted Cd')
+    plt.title(f'Model: {model_name} | Actual vs Predicted Cd')
+    plt.legend()
+    plt.grid()
+    plt.savefig(rf"plots\{model_type}\{model_name}\pvsa_cd.png", dpi=300, bbox_inches='tight')
+    plt.clf()
+
+    ranger = np.linspace(collector_dict['actual']['test'][:,1].cpu().min(), collector_dict['actual']['test'][:,1].cpu().max(), 10000)
+    plt.scatter(collector_dict['actual']['test'][:,1].cpu().numpy(), collector_dict['preds']['test'][:,1].cpu().numpy(), s=0.5)
+    plt.plot(ranger, ranger, color='k', label='goalline')
+    plt.xlabel('Actual Cl')
+    plt.ylabel('Predicted Cl')
+    plt.title(f'Model: {model_name} | Actual vs Predicted Cl')
+    plt.legend()
+    plt.grid()
+    plt.savefig(rf"plots\{model_type}\{model_name}\pvsa_cl.png", dpi=300, bbox_inches='tight')
+    plt.clf()
+
+    ranger = np.linspace(collector_dict['actual']['test'][:,2].cpu().min(), collector_dict['actual']['test'][:,2].cpu().max(), 10000)
+    plt.scatter(collector_dict['actual']['test'][:,2].cpu().numpy(), collector_dict['preds']['test'][:,2].cpu().numpy(), s=0.5)
+    plt.plot(ranger, ranger, color='k', label='goalline')
+    plt.xlabel('Actual Cm')
+    plt.ylabel('Predicted Cm')
+    plt.title(f'Model: {model_name} | Actual vs Predicted Cm')
+    plt.legend()
+    plt.grid()
+    plt.savefig(rf"plots\{model_type}\{model_name}\pvsa_cm.png", dpi=300, bbox_inches='tight')
+    plt.clf()
+
+
+    # Residual plots
+
+    residuals = collector_dict['actual']['test'][:,0].cpu().numpy() - collector_dict['preds']['test'][:,0].cpu().numpy()
+    fig, ax = plt.subplots()
+    ax.hist(residuals, bins=200, alpha=0.7, label='Residuals')
+    ax.axhline(y=0, color='r', linestyle='--')
+    ax.set_title(f"Model: {model_name} | Residuals for Cd")
+    ax.set_xlabel('Residual for Cd')
+    ax.set_ylabel('Amount')
+    plt.grid(True)
+    fig.savefig(rf"plots\{model_type}\{model_name}\resids_cd.png", dpi=300, bbox_inches='tight')
+    plt.close(fig)
+
+    residuals = collector_dict['actual']['test'][:,1].cpu().numpy() - collector_dict['preds']['test'][:,1].cpu().numpy()
+    fig, ax = plt.subplots()
+    ax.hist(residuals, bins=200, alpha=0.7, label='Residuals')
+    ax.axhline(y=0, color='r', linestyle='--')
+    ax.set_title(f"Model: {model_name} | Residuals for Cl")
+    ax.set_xlabel('Residual for Cl')
+    ax.set_ylabel('Amount')
+    plt.grid(True)
+    fig.savefig(rf"plots\{model_type}\{model_name}\resids_cl.png", dpi=300, bbox_inches='tight')
+    plt.close(fig)
+
+    residuals = collector_dict['actual']['test'][:,2].cpu().numpy() - collector_dict['preds']['test'][:,2].cpu().numpy()
+    fig, ax = plt.subplots()
+    ax.hist(residuals, bins=200, alpha=0.7, label='Residuals')
+    ax.axhline(y=0, color='r', linestyle='--')
+    ax.set_title(f"Model: {model_name} | Residuals for Cm")
+    ax.set_xlabel('Residual for Cm')
+    ax.set_ylabel('Amount')
+    plt.grid(True)
+    fig.savefig(rf"plots\{model_type}\{model_name}\resids_cm.png", dpi=300, bbox_inches='tight')
+    plt.close(fig)
