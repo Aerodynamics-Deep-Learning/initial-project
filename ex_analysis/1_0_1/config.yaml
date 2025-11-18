@@ -1,0 +1,49 @@
+cfg_data:
+  # Data handle, relative from project root
+  data_path: 'C:\SenkDosya\Projects\AeroML\airfoil_data\airfoil_dataset_8bern.csv'
+  # Locs of data as indices in csv, inclusive
+  loc_geometry: [1,20] 
+  loc_cond: [21,23]
+  loc_perf_coeffs: [24,26]
+  loc_names: 0
+  reynolds_norm_factor: 1000000
+
+cfg_train:
+  # Cfgs for the loader
+  cfg_loader:
+    # Number of epochs
+    n_epoch: 100
+    # N train per epoch
+    n_train: 1000
+    # N of test
+    n_test: 17250
+    # Training batch size
+    train_batch: 1
+  dtype: 'float32'
+  device: 'cuda'
+
+cfg_export:
+  project_name: 'ex_analysis: 1_0_1'
+  run_name: 'run'
+  model_save: 'model_save'
+  val_save: 'val_saves'
+
+cfg_model_setup:
+  model_type: 'NIF_Pointwise'
+  cfg_model: 
+
+cfg_optim_setup:
+
+  optim_type: 'AdamW'
+  cfg_optim:
+    lr: 0.001
+    weight_decay: 0.01
+  
+  cfg_scheduler_setup:
+    scheduler_type: 'StepLR'
+    cfg_scheduler: 
+      step_size: 10
+      gamma: 0.1
+
+cfg_loss_setup:
+  loss_type: 'MSE'

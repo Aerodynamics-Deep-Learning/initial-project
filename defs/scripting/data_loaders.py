@@ -1,6 +1,7 @@
 import pandas as pd
 import torch
 from torch.utils.data import Dataset, random_split, DataLoader
+from pathlib import Path
 
 class AirfoilDataset(Dataset):
 
@@ -110,4 +111,33 @@ def get_dataloaders(ds:(AirfoilDataset), cfg_loader:(dict), seed:(int)= 31):
     dl_test = DataLoader(ds_test, batch_size=len(ds_test), shuffle=True) 
 
     return dl_train, dl_val, dl_test
+
+def create_dataloaders(cfg_data, cfg_loader):
+
+    data_path = Path(cfg_data['data_path']).resolve()
+
+    if not data_path.exists():
+        raise FileNotFoundError(f"Could not find data at: {data_path}")
+
+    df = pd.read_csv(data_path)
+
+    df = df.drop(['N1', 'N2'], axis=1) # Remove N1 and N2 since all the airfoils are subsonic
+
+    df['Reynolds'] = df['Reynolds'] / cfg_data.get('reynolds_norm_factor', 1000000) # Normalize the Reynolds feature, too dominant
+
+    geom, cond, perf, names= get_dataset(df, 
+                                        loc_geometry= cfg_data['loc_geometry'], 
+                                        loc_cond= cfg_data['loc_cond'], 
+                                        loc_perf_coeffs= cfg_data['loc_perf_coeffs'], 
+                                        loc_names= cfg_data['loc_names']) # Get the necessary stuff for the dataset
+
+    ds = AirfoilDataset(geom, cond, perf, names)
+
+    del df, geom, cond, perf, names # Delete these to preserve memory
+
+    dl_train, dl_val, dl_test = get_dataloaders(ds=ds, cfg_loader=cfg_loader)
+
+    dataloaders = [dl_train, dl_val, dl_test]; del dl_train, dl_val, dl_test
+
+    return dataloaders
 
