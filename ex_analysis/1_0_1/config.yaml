@@ -23,27 +23,35 @@ cfg_train:
   device: 'cuda'
 
 cfg_export:
-  project_name: 'ex_analysis: 1_0_1'
-  run_name: 'run'
+  project_name: 'ex_analysis_1_0_1'
+  run_name: 'trial_1'
   model_save: 'model_save'
   val_save: 'val_saves'
 
 cfg_model_setup:
+
   model_type: 'NIF_Pointwise'
+  
   cfg_model: 
+
+    cfg_shape_net:
+      input_dim: 20
+      output_dim: 3
+      hidden_units: [32,32,32]
+      shape_activation: "GELU"
+
+    cfg_param_net:
+      input_dim: 3
+      hidden_units: [32,32]
+      shape_activation: "GELU"
 
 cfg_optim_setup:
 
   optim_type: 'AdamW'
+
   cfg_optim:
     lr: 0.001
     weight_decay: 0.01
-  
-  cfg_scheduler_setup:
-    scheduler_type: 'StepLR'
-    cfg_scheduler: 
-      step_size: 10
-      gamma: 0.1
 
 cfg_loss_setup:
-  loss_type: 'MSE'
+  loss_type: 'MSELoss'

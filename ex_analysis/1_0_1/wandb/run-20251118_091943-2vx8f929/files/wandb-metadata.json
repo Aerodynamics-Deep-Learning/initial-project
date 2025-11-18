@@ -1,0 +1,44 @@
+{
+  "os": "Windows-11-10.0.26100-SP0",
+  "python": "CPython 3.12.7",
+  "startedAt": "2025-11-18T14:19:43.925870Z",
+  "args": [
+    "--config",
+    "config.yaml"
+  ],
+  "program": "C:\\SenkDosya\\Projects\\AeroML\\initial-project\\defs\\script\\run.py",
+  "codePath": "defs\\script\\run.py",
+  "codePathLocal": "..\\..\\defs\\script\\run.py",
+  "git": {
+    "remote": "https://github.com/Aerodynamics-Deep-Learning/initial-project.git",
+    "commit": "a621adccd7dffd63c9042ed2dd83ff42df712480"
+  },
+  "email": "airfoillearner@gmail.com",
+  "root": "C:\\SenkDosya\\Projects\\AeroML\\initial-project\\ex_analysis\\1_0_1",
+  "host": "Ege_Laptop",
+  "executable": "C:\\Users\\Ege Artan\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+  "cpu_count": 8,
+  "cpu_count_logical": 16,
+  "gpu": "NVIDIA GeForce RTX 3050 Ti Laptop GPU",
+  "gpu_count": 1,
+  "disk": {
+    "/": {
+      "total": "999299551232",
+      "used": "737389686784"
+    }
+  },
+  "memory": {
+    "total": "16370769920"
+  },
+  "gpu_nvidia": [
+    {
+      "name": "NVIDIA GeForce RTX 3050 Ti Laptop GPU",
+      "memoryTotal": "4294967296",
+      "cudaCores": 2560,
+      "architecture": "Ampere",
+      "uuid": "GPU-bf537d56-485a-66d9-ad2a-07d909b35d0b"
+    }
+  ],
+  "cudaVersion": "12.9",
+  "writerId": "3kcqszcgve6l96d2idmiaerh82wvy6p1"
+}

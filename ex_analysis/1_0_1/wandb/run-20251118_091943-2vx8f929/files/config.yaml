@@ -1,0 +1,117 @@
+_wandb:
+    value:
+        cli_version: 0.23.0
+        e:
+            3kcqszcgve6l96d2idmiaerh82wvy6p1:
+                args:
+                    - --config
+                    - config.yaml
+                codePath: defs\script\run.py
+                codePathLocal: ..\..\defs\script\run.py
+                cpu_count: 8
+                cpu_count_logical: 16
+                cudaVersion: "12.9"
+                disk:
+                    /:
+                        total: "999299551232"
+                        used: "737389686784"
+                email: airfoillearner@gmail.com
+                executable: C:\Users\Ege Artan\AppData\Local\Programs\Python\Python312\python.exe
+                git:
+                    commit: a621adccd7dffd63c9042ed2dd83ff42df712480
+                    remote: https://github.com/Aerodynamics-Deep-Learning/initial-project.git
+                gpu: NVIDIA GeForce RTX 3050 Ti Laptop GPU
+                gpu_count: 1
+                gpu_nvidia:
+                    - architecture: Ampere
+                      cudaCores: 2560
+                      memoryTotal: "4294967296"
+                      name: NVIDIA GeForce RTX 3050 Ti Laptop GPU
+                      uuid: GPU-bf537d56-485a-66d9-ad2a-07d909b35d0b
+                host: Ege_Laptop
+                memory:
+                    total: "16370769920"
+                os: Windows-11-10.0.26100-SP0
+                program: C:\SenkDosya\Projects\AeroML\initial-project\defs\script\run.py
+                python: CPython 3.12.7
+                root: C:\SenkDosya\Projects\AeroML\initial-project\ex_analysis\1_0_1
+                startedAt: "2025-11-18T14:19:43.925870Z"
+                writerId: 3kcqszcgve6l96d2idmiaerh82wvy6p1
+        m: []
+        python_version: 3.12.7
+        t:
+            "1":
+                - 1
+                - 5
+                - 53
+            "2":
+                - 1
+                - 5
+                - 53
+            "3":
+                - 2
+                - 13
+                - 16
+                - 62
+            "4": 3.12.7
+            "5": 0.23.0
+            "8":
+                - 3
+            "12": 0.23.0
+            "13": windows-amd64
+cfg_data:
+    value:
+        data_path: C:\SenkDosya\Projects\AeroML\airfoil_data\airfoil_dataset_8bern.csv
+        loc_cond:
+            - 21
+            - 23
+        loc_geometry:
+            - 1
+            - 20
+        loc_names: 0
+        loc_perf_coeffs:
+            - 24
+            - 26
+        reynolds_norm_factor: 1000000
+cfg_export:
+    value:
+        model_save: model_save
+        project_name: ex_analysis_1_0_1
+        run_name: trial_1
+        val_save: val_saves
+cfg_loss_setup:
+    value:
+        loss_type: MSELoss
+cfg_model_setup:
+    value:
+        cfg_model:
+            cfg_param_net:
+                hidden_units:
+                    - 32
+                    - 32
+                input_dim: 3
+                shape_activation: GELU
+            cfg_shape_net:
+                hidden_units:
+                    - 32
+                    - 32
+                    - 32
+                input_dim: 20
+                output_dim: 3
+                shape_activation: GELU
+        model_type: NIF_Pointwise
+cfg_optim_setup:
+    value:
+        cfg_optim:
+            lr: 0.001
+            weight_decay: 0.01
+        optim_type: AdamW
+cfg_train:
+    value:
+        cfg_loader:
+            n_epoch: 100
+            n_test: 17250
+            n_train: 1000
+            train_batch: 1
+        device: cuda
+        dtype: torch.float32

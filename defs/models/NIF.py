@@ -21,13 +21,24 @@ class NIF_Pointwise(nn.Module):
         self.shape_i_dim = cfg_shape_net['input_dim']
         self.shape_o_dim = cfg_shape_net['output_dim']
         self.shape_hidden_units = cfg_shape_net['hidden_units']
-        self.shape_activation = cfg_shape_net.get('shape_activation', nn.Tanh)()
+
+        self.shape_actname = cfg_shape_net.get('shape_activation', 'GELU')
+        try:
+            self.shape_activation = getattr(nn, self.shape_actname)()
+        except:
+            raise ValueError(f"Unknown Activation for Shape Net: {self.shape_actname}")
 
         # Initialize paremeter network parameters
         self.cfg_param_net = cfg_param_net
         self.param_i_dim = cfg_param_net['input_dim']
         self.param_hidden_units = cfg_param_net['hidden_units']
-        self.param_activation = cfg_param_net.get('param_activation', nn.Tanh)()
+
+        self.param_actname = cfg_param_net.get('param_activation', 'GELU')
+        try:
+            self.param_activation = getattr(nn, self.param_actname)()
+        except:
+            raise ValueError(f"Unknown Activation for Shape Net: {self.param_actname}")
+        
 
         self.param_latent_dim = sum(self.shape_hidden_units) + self.shape_o_dim # Define length of latent dim of param net
 
@@ -136,14 +147,24 @@ class NIF_PartialPaper(nn.Module):
         self.shape_i_dim = cfg_shape_net['input_dim']
         self.shape_o_dim = cfg_shape_net['output_dim']
         self.shape_hidden_units = cfg_shape_net['hidden_units']
-        self.shape_activation = cfg_shape_net.get('shape_activation', nn.Tanh)()
+        
+        self.shape_actname = cfg_shape_net.get('shape_activation', 'GELU')
+        try:
+            self.shape_activation = getattr(nn, self.shape_actname)()
+        except:
+            raise ValueError(f"Unknown Activation for Shape Net: {self.shape_actname}")
 
         # Initialize paremeter network parameters
         self.cfg_param_net = cfg_param_net
         self.param_i_dim = cfg_param_net['input_dim']
         self.param_generated_unit = cfg_param_net['generated_unit']
         self.param_hidden_units = cfg_param_net['hidden_units']
-        self.param_activation = cfg_param_net.get('param_activation', nn.Tanh)()
+        
+        self.param_actname = cfg_param_net.get('param_activation', 'GELU')
+        try:
+            self.param_activation = getattr(nn, self.param_actname)()
+        except:
+            raise ValueError(f"Unknown Activation for Shape Net: {self.param_actname}")
 
 
         # -----Build param network-----
