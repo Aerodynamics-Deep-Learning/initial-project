@@ -18,13 +18,13 @@ if __name__ == "__main__":
     print("WandB has been setup.")
 
     # Initialize Data, Model, Optim, Loss
-    dataloaders = create_dataloaders(cfg_data= cfg_data, cfg_loader= cfg_loader)
-    model = load_model(cfg_model_setup= cfg_model_setup)
-    optimizer, scheduler = load_optim(cfg_optim_setup= cfg_optim_setup, model= model)
-    loss_fn = load_loss(cfg_loss_setup= cfg_loss_setup)
+    dataloaders = create_dataloaders(cfg_data= cfg_data, cfg_loader= cfg_loader); print("Dataloaders created.")
+    model = load_model(cfg_model_setup= cfg_model_setup); print("Model created.")
+    optimizer, scheduler = load_optim(cfg_optim_setup= cfg_optim_setup, model= model); print("Optimizer and scheduler created.")
+    loss_fn = load_loss(cfg_loss_setup= cfg_loss_setup); print("Loss function created.")
 
     try:
-        train(cfg_train=cfg_train, cfg_export=cfg_export, model=model, optimizer=optimizer, scheduler=scheduler, loss_fn=loss_fn, dataloaders=dataloaders)
+        train(cfg_train=cfg_train, cfg_export=cfg_export, model=model, optimizer=optimizer, scheduler=scheduler, loss_fn=loss_fn, dataloaders=dataloaders); print("Training complete.")
 
     except Exception as e:
         run.alert(title= "Training Crashed", text=str(e))

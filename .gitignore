@@ -19,3 +19,10 @@ venv/
 # Tensorboard logs
 runs/*
 !runs/**/*.ipynb
+
+# Weights and Biases files
+wandb/
+
+# Parquet files
+*.parquet
+
