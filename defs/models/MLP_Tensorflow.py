@@ -37,6 +37,7 @@ class MLPRegressor:
           - dropout_rate (float, default 0.2)
           - learning_rate (float, default 1e-3)
           - task_type ('regression'|'classification', default 'regression')
+          - data_type (kulfan/cord) # Here, we determine what type of data will be provided for training; thus, the input of the model can be changed depening on the purpose
         """
         # Core
         self.i_dim = int(cfg_mlp["input_dim"])
@@ -51,6 +52,7 @@ class MLPRegressor:
         self.dropout_rate = float(cfg_mlp.get("dropout_rate", 0.2))
         self.learning_rate = float(cfg_mlp.get("learning_rate", 1e-3))
         self.task_type = cfg_mlp.get("task_type", "regression")
+        self.data_type = cfg_mlp.get("data_type", "kulfan")
 
         # Keras activation getter (works with strings/functions)
         self.activation = keras.activations.get(self.activation_name)
@@ -205,7 +207,7 @@ def parse_coordinate_series(s: pd.Series):
     return x, y
 
 
-def load_airfoil_data(file_path, target_columns=None):
+def load_airfoil_data(file_path, data_type, target_columns=None):
     """Load airfoil CSV data with coordinate points."""
     print(f"Loading airfoil data from: {file_path}")
 
@@ -216,15 +218,22 @@ def load_airfoil_data(file_path, target_columns=None):
         df = pd.read_csv(file_path)
         print(f" Data loaded: {df.shape}")
 
-        # coordinate columns: p0, p1, ...
-        coord_cols = [c for c in df.columns if c.startswith("p") and c[1:].isdigit()]
-        coord_cols.sort(key=lambda x: int(x[1:]))
-
         feature_data, feature_names = [], []
-        for col in coord_cols:
-            x_coords, y_coords = parse_coordinate_series(df[col])
-            feature_data.extend([x_coords, y_coords])
-            feature_names.extend([f"{col}_x", f"{col}_y"])
+        if data_type == "kulfan":
+            kulfan_cols = list(df.columns[:22]) # 22 is the first 22 columns of the dataset which corresponds to the kulfan parameters, but we can make it more generilized expression later
+
+            for col in kulfan_cols:
+                feature_data.append(df[col].to_numpy())
+                feature_names.append(col)
+        else:
+            # coordinate columns: p0, p1, ...
+            coord_cols = [c for c in df.columns if c.startswith("p") and c[1:].isdigit()]
+            coord_cols.sort(key=lambda x: int(x[1:]))
+
+            for col in coord_cols:
+                x_coords, y_coords = parse_coordinate_series(df[col])
+                feature_data.extend([x_coords, y_coords])
+                feature_names.extend([f"{col}_x", f"{col}_y"])
 
         # flow conditions
         for col in ["Re", "Mach", "AoA_deg"]:
@@ -257,7 +266,7 @@ def train_airfoil_mlp(file_path, target_columns=["C_d"], epochs=150):
     """Complete pipeline for airfoil MLP training."""
     set_seed(42)
 
-    result = load_airfoil_data(file_path, target_columns)
+    result = load_airfoil_data(file_path, "kulfan", target_columns)
     if result[0] is None:
         return None, None
     X, y, feature_names, target_names, df = result
@@ -272,7 +281,7 @@ def train_airfoil_mlp(file_path, target_columns=["C_d"], epochs=150):
 
     print(f"Training: {X_train_scaled.shape}, Validation: {X_val_scaled.shape}, Test: {X_test_scaled.shape}")
 
-    cfg_mlp = {
+    cfg_mlp = { # input_dim and data_type can be made more user friendly later; however, it is not important right no
         "input_dim": X_train_scaled.shape[1],
         "output_dim": len(target_names),
         "hidden_units": [256, 128, 64, 32],
@@ -280,6 +289,7 @@ def train_airfoil_mlp(file_path, target_columns=["C_d"], epochs=150):
         "dropout_rate": 0.2,
         "learning_rate": 1e-3,
         "task_type": "regression",
+        "data_type": "kulfan"
     }
 
     print("\n MLP Configuration:")
