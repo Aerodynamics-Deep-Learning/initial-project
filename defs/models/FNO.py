@@ -1,12 +1,7 @@
 
 #region Imports
 
-import torch
 import torch.nn as nn
-import numpy as np
-
-import sys
-import pathlib
 
 from model_helpers.fno_layers import *
 from MLP import *
@@ -17,53 +12,72 @@ from MLP import *
 
 class FNO1D(nn.Module):
 
-    def __init__(self, cfg_p, cfg_q, cfg_fourierblock):
-        super(FNO1D, self).__init__()
+    def __init__(self, cfg_p:(dict), cfg_q:(dict), fb_hidden_dim:(list[int]), fb_modes:(list[int]), fb_kernel:(list[int]), fb_act_fn:(str)):
+        super().__init__()
 
         # Initialize P Network (elevator)
-        self.p_network = MLP(cfg_mlp= cfg_p)
+        self.P_Net = MLPLayer(**cfg_p)
 
         # Initialize Q Network (reducer)
-        self.q_network = MLP(cfg_mlp= cfg_q)
+        self.Q_Net = MLPLayer(**cfg_q)
 
         # Initialize Fourier Block
-        self.fb_pout = cfg_p['output_dim']
-        self.fb_qin = cfg_q['input_dim']
-        self.fb_hidden_dim = cfg_fourierblock['hidden_dim']
-        self.fb_modes = cfg_fourierblock['modes']
-        self.fb_kernel = cfg_fourierblock['kernel']
-        self.fb_activation = cfg_fourierblock.get('activation', nn.Tanh)()
+        self.fb_in = cfg_p['output_dim']
+        self.fb_out = cfg_q['input_dim']
+        self.fb_hidden_dim = fb_hidden_dim
+        self.fb_modes = fb_modes
+        self.fb_kernel = fb_kernel
+        self.fb_activation = get_activation(fb_act_fn or "gelu")
 
         assert len(self.fb_kernel) == len(self.fb_modes), 'Fourier Block kernel and modes lists have to be same len.'
         assert len(self.fb_hidden_dim) + 1 == len(self.fb_kernel), 'Hidden list has to be 1 less than kernel list in ken.'
 
-        # Build Fourier Block
-        self.fb = [FourierLayer1DLocal(in_channels= self.fb_pout, 
-                                       out_channels= self.fb_hidden_dim[0], 
-                                       modes= self.fb_modes[0], 
-                                       kernel= self.fb_kernel[0]), self.fb_activation]
+        # Build Fourier Block, init block
+        self.FourierBlock = [
+            FourierLayer1D(
+                in_channels= self.fb_in,
+                out_channels= self.fb_hidden_dim[0],
+                modes = self.fb_modes[0],
+                kernel= self.fb_kernel[0]
+            ),
+            self.fb_activation
+        ]
 
-        for i in range(len(self.fb_hidden_dim)):
+        # Additional blocks
+        for i in range(len(self.fb_hidden_dim) - 1):
 
-            self.fb.append(FourierLayer1DLocal(in_channels= self.fb_hidden_dim[i],
-                                               out_channels= self.fb_hidden_dim[i+1],
-                                               modes= self.fb_modes[i+1],
-                                               kernel= self.fb_kernel[i+1]))
-            self.fb.append(self.fb_activation)
+            self.FourierBlock.extend(
+                FourierLayer1D(
+                    in_channels= self.fb_hidden_dim[i],
+                    out_channels= self.fb_hidden_dim[i+1],
+                    modes= self.fb_modes[i+1],
+                    kernel= self.fb_kernel[i+1]
+                ),
+                self.fb_activation
+            )
 
-        self.fb.append(FourierLayer1DLocal(in_channels= self.fb_hidden_dim[-1],
-                                           out_channels= self.fb_qin,
-                                           modes= self.fb_modes[-1], 
-                                           kernel= self.fb_kernel[-1]))
-        self.fb.append(self.fb_activation)
+        # Last block
+        self.FourierBlock.extend(
+                FourierLayer1D(
+                    in_channels= self.fb_hidden_dim[-1],
+                    out_channels= self.fb_out,
+                    modes= self.fb_modes[-1],
+                    kernel= self.fb_kernel[-1]
+                ),
+                self.fb_activation
+            )
 
-        self.fourierblock = nn.Sequential[*self.fb]
+        self.FourierBlock = nn.Sequential[*self.FourierBlock]
 
     def forward(self, input):
 
-        input = self.p_network(input)
-        input = self.fb(input)
+        # Put it through the p network first
+        input = self.P_Net(input)
 
-        return self.q_network(input)
+        # Then through the fourier blocks
+        input = self.FourierBlock(input)
+
+        # Lastly through the q network, return the result
+        return self.Q_Net(input)
 
 #endregion
